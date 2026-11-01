@@ -22,7 +22,8 @@ function Test-IsAdministrator {
 function Select-InstallScope {
     $options = @(
         "Current User",
-        "Local Machine"
+        "Local Machine",
+        "Cancel"
     )
 
     $selected = 0
@@ -33,17 +34,18 @@ function Select-InstallScope {
         Write-Host ""
 
         for ($i = 0; $i -lt $options.Count; $i++) {
+            $shortcut = if ($i -eq 2) { "Esc" } else { $i + 1 }
+
             if ($i -eq $selected) {
-                Write-Host "[>$($i + 1)<] $($options[$i])" -ForegroundColor Cyan
+                Write-Host "[>$shortcut<] $($options[$i])" -ForegroundColor Cyan
             }
             else {
-                Write-Host "[ $($i + 1) ] $($options[$i])"
+                Write-Host "[ $shortcut ] $($options[$i])"
             }
         }
 
-        Write-Host "[Esc] Cancel installation"
         Write-Host ""
-        Write-Host "Use Up/Down arrows and Enter, or press 1/2."
+        Write-Host "Use Up/Down arrows and Enter, or press 1/2/Esc."
 
         $key = [Console]::ReadKey($true)
 
@@ -71,10 +73,14 @@ function Select-InstallScope {
                     return "CurrentUser"
                 }
 
-                return "LocalMachine"
+                if ($selected -eq 1) {
+                    return "LocalMachine"
+                }
+
+                return "Cancel"
             }
             "Escape" {
-                return $null
+                return "Cancel"
             }
         }
     }
@@ -84,7 +90,7 @@ try {
     if ([string]::IsNullOrWhiteSpace($InstallScope)) {
         $InstallScope = Select-InstallScope
 
-        if ($null -eq $InstallScope) {
+        if ($InstallScope -eq "Cancel") {
             Write-Host "Installation cancelled."
             exit 0
         }
@@ -92,7 +98,7 @@ try {
 
     if ($InstallScope -eq "LocalMachine" -and -not (Test-IsAdministrator)) {
         if ([string]::IsNullOrWhiteSpace($PSCommandPath)) {
-            throw "Local Machine installation requires running this saved .ps1 file as administrator."
+            throw "Local Machine installation requires opening the shell as administrator"
         }
 
         Write-Host "Administrator permission is required. Requesting elevation..."
@@ -125,7 +131,7 @@ try {
 
     $expectedThumbprint = $expectedThumbprint.Replace(" ", "").ToUpperInvariant()
 
-    if ($expectedThumbprint -eq "REPLACE_WITH_CERTIFICATE_THUMBPRINT") {
+    if ($expectedThumbprint -eq "30FDBB1BB5B5E1DDF37A0C883A65BAF18FF404AE") {
         throw "Set `$expectedThumbprint to your certificate thumbprint first."
     }
 
@@ -144,14 +150,14 @@ try {
 
     if ($actualThumbprint -ne $expectedThumbprint) {
         throw @"
-Certificate thumbprint mismatch.
+Certificate thumbprint mismatch please open an issue on github.
 
 Expected: $expectedThumbprint
 Received: $actualThumbprint
 
 The certificate was not installed.
 "@
-    }
+}
 
     if ($certificate.NotAfter -lt (Get-Date)) {
         throw "The certificate has expired. It was not installed."
